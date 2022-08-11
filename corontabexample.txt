@@ -1,0 +1,1 @@
+00 05 * * * /home/chris/Documents/django/environments/newsapi/bin/python3 /home/chris/Documents/django/newsscraper/manage.py get_news >/dev/null 2>&1
