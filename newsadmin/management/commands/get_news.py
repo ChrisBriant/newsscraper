@@ -2,7 +2,9 @@
 from django.core.management.base import BaseCommand, CommandError
 from urllib.request import Request, urlopen, HTTPError
 from bs4 import BeautifulSoup
-from newsadmin.models import NewsItem 
+from newsadmin.models import NewsItem
+from datetime import datetime, timedelta
+from django.utils.timezone import make_aware
 
 NEWS_SITES = [
     { 
@@ -21,7 +23,10 @@ NEWS_SITES = [
         'site' : 'metro',
         'url' : 'https://metro.co.uk/news/'
     },
-    
+    {
+        'site' : 'channel4',
+        'url' : 'https://www.channel4.com/news/'        
+    },
 ]
 
 collected_headlines = []
@@ -69,8 +74,22 @@ def process_metro(url,soup):
             }
             headline['link'] = parent_link
             headline['headline'] = result.decode_contents().split('<span')[0].strip()
-            # print(parent_link)
-            # print(result.decode_contents().split('<span')[0].strip())
+            collected_headlines.append(headline)
+
+def process_channel4(url,soup):
+    results = soup.find_all(class_='content with-image')
+    for result in results:
+        if len(result) > 0:
+            title = result.find(class_='description').decode_contents()
+            link = result.find(class_='permalink')
+            if link:
+                headline = {
+                    'site' : 'channel4',
+                }
+                headline['link'] = link.attrs.get('href')
+                headline['headline'] = title
+                collected_headlines.append(headline)
+
 
 def process_soup(site,soup):
     if site['site'] == 'bbc':
@@ -82,7 +101,8 @@ def process_soup(site,soup):
         process_gbnews(site['url'],soup)
     if site['site'] == 'metro':
         process_metro(site['url'],soup)
-
+    if site['site'] == 'channel4':
+        process_channel4(site['url'],soup)
 
 def get_soup(request):
     source_code = None
@@ -96,6 +116,15 @@ def get_soup(request):
         return None
     return BeautifulSoup(source_code, 'html.parser')
 
+#Gets the old news items from the database and removes them to clean up DB
+def purge_previous_news_items():
+    date_now = datetime.now()
+    start_of_day = make_aware(datetime.strptime(date_now.strftime('%Y-%m-%d'),'%Y-%m-%d') + timedelta(hours=5))
+    print(start_of_day)
+    #GET ALL PREVIOUS ITEMS
+    items_before = NewsItem.objects.filter(date_added__lt=start_of_day)
+    print(items_before)
+    items_before.delete()
 
 class Command(BaseCommand):
     help = 'Get news for today'
@@ -114,6 +143,8 @@ class Command(BaseCommand):
         'Connection': 'keep-alive'}
 
         #MAIN
+
+        purge_previous_news_items()
 
         for site in NEWS_SITES:
             req = Request(
