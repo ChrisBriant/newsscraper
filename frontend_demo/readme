@@ -1,0 +1,2 @@
+This contains a front end demo which makes calls to the rest api to get 10 items and then there is some JavaScript
+to display random headlines with a link to the source.

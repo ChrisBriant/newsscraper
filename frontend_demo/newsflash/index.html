@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>News Flash</title>
+</head>
+
+<script language="javascript">
+    const getNewsItems = () => {
+        return new Promise((resolve,reject) => {
+            fetch('https://newsscraper.chrisbriant.uk/api/getrandom?amount=10', {
+                    method: 'GET',
+                })
+                .then((response) => response.json())
+                .then((data) => {
+                    return resolve(data);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    return resolve(error);
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const newsItems = await getNewsItems();
+        const cursor = `&#9608;`;
+        //Get target elements
+        const flashTarget = document.querySelector('.headline-display p');
+        const sourceLink = document.querySelector('#source-ref');
+        
+        let currentItem = newsItems[0];
+        let currentHeadline = currentItem.headline;
+        let flashText = '';
+        let lingerTimeout = null;
+        let cursorFlashInterval = 1000;
+
+
+        const setSourceLink = (newsItem) => {
+            sourceLink.innerHTML = `${currentItem.source} <span id='click-message'>- click to read more -</span> `;
+            sourceLink.setAttribute('href', currentItem.link);
+        }
+
+        setSourceLink(currentItem);
+
+        setInterval(() => {
+            if(flashText.length < currentItem.headline.length) {
+                flashText += currentHeadline[0];
+                currentHeadline = currentHeadline.substring(1);
+            } else {
+                //Linger before resetting to a new headline
+                if(!lingerTimeout) {
+                    lingerTimeout = setTimeout(() => {
+                        const randomIndex = Math.floor(Math.random() * newsItems.length);
+                        currentItem = newsItems[randomIndex];
+                        currentHeadline = currentItem.headline;
+                        setSourceLink(currentItem);
+                        flashText = '';
+                        lingerTimeout = null;
+                    },3000);
+                }
+            }
+            //Handle cursor reset
+            if(cursorFlashInterval == 1000) {
+                flashTarget.innerHTML = flashText + cursor;
+                cursorFlashInterval = 0;
+            } else {
+                flashTarget.innerHTML = flashText;
+                cursorFlashInterval += 100;
+            }
+        },100);
+    });
+
+
+</script>
+
+<body>
+    <main>
+        <section id="newsflash">
+            <div class="newsitem-container">
+                <div class="newsitem-logo">
+                    <img src="newsflashlogo.png" alt="Newsflash Logo">
+                </div>
+                <div class="headline-display">
+                    <div class="headline-main">
+                        <h1>Latest Headlines</h1>
+                        <p></p>
+                    </div>
+                    <div class="headline-footer">
+                        <p><strong>Source: </strong></p>
+                        <a id="source-ref" href="#" target="_blank"></a>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+</body>
+</html>
