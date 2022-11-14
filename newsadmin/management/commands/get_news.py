@@ -2,7 +2,7 @@
 from django.core.management.base import BaseCommand, CommandError
 from urllib.request import Request, urlopen, HTTPError
 from bs4 import BeautifulSoup
-from newsadmin.models import NewsItem
+from newsadmin.models import NewsItem,StoredNewsItem
 from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
 
@@ -30,6 +30,14 @@ NEWS_SITES = [
 ]
 
 collected_headlines = []
+#Store top headline from each source
+top_headlines = []
+
+#Function to store the last appended item to the collected headlines
+def store_top_headline():
+    if len(collected_headlines) > 0:
+        top_headlines.append(collected_headlines[-1])
+
 
 def process_bbc(url,soup):
     base_url = url.split('/news')[0]
@@ -44,6 +52,8 @@ def process_bbc(url,soup):
             headline['link'] = base_url + href
             headline['headline'] = title
             collected_headlines.append(headline)
+    #Store top headline
+    store_top_headline()
 
 def process_yahoo(url,soup):
     results = soup.find_all(class_='js-content-viewer')
@@ -62,19 +72,21 @@ def process_gbnews(url,soup):
             #Check it is not the last entry which is not a headline
             if headline['headline'] != 'MORE GB NEWS':
                 collected_headlines.append(headline)
-        ##print(result.decode_contents())
+    #Store top headline
+    store_top_headline()
 
 def process_metro(url,soup):
-    results = soup.find_all(class_='post')
+    results = soup.find_all(class_='metro__post__title')
     for result in results:
-        parent_link = result.attrs.get('href')
-        if parent_link:
-            headline = {
-                'site' : 'metro',
-            }
-            headline['link'] = parent_link
-            headline['headline'] = result.decode_contents().split('<span')[0].strip()
-            collected_headlines.append(headline)
+        news_link = result.findChild('a')
+        headline = {
+            'site' : 'metro',
+        }
+        headline['link'] = news_link.attrs.get('href')
+        headline['headline'] = news_link.findChild('span').text
+        collected_headlines.append(headline)
+    #Store top headline
+    store_top_headline()
 
 def process_channel4(url,soup):
     results = soup.find_all(class_='content with-image')
@@ -89,6 +101,8 @@ def process_channel4(url,soup):
                 headline['link'] = link.attrs.get('href')
                 headline['headline'] = title
                 collected_headlines.append(headline)
+    #Store top headline
+    store_top_headline()
 
 
 def process_soup(site,soup):
@@ -158,6 +172,14 @@ class Command(BaseCommand):
 
         for headline in collected_headlines:
             NewsItem.objects.create(
+                source = headline['site'],
+                link = headline['link'],
+                headline = headline['headline'],
+            )
+
+        #Add the top headlines to the perisisted headline table
+        for headline in top_headlines:
+            StoredNewsItem.objects.create(
                 source = headline['site'],
                 link = headline['link'],
                 headline = headline['headline'],
